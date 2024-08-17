@@ -42,8 +42,10 @@ async function run() {
       res.send(result);
     });
 
+    // create a new classroom
     app.post("/classroom", async (req, res) => {
       const newClassroom = req.body;
+      newClassroom.students = [];
       newClassroom.name.trim();
       const isClassroomExist = await classroomsCollection.findOne({
         name: newClassroom?.name,
@@ -58,7 +60,7 @@ async function run() {
       res.send(result);
     });
 
-    // crate a classroom
+    // get all classrooms
     app.get("/classrooms", async (req, res) => {
       const result = await classroomsCollection.find().toArray();
       res.send(result);
@@ -89,6 +91,31 @@ async function run() {
         { name: teacher.assignedClass },
         updatedDoc
       );
+      res.send(result);
+    });
+
+    // save a student
+    app.patch("/add-student", async (req, res) => {
+      const student = req.body;
+      const isEmailExist = await usersCollection.findOne({
+        email: student?.email,
+      });
+      if (isEmailExist) {
+        return res.send({ message: "Email is existed" });
+      }
+      const resp = await usersCollection.insertOne({
+        email: student?.email,
+        password: student?.password,
+        role: "student",
+      });
+      if (!resp.insertedId) {
+        return res.send({ message: "Something went wrong" });
+      }
+      delete student.password;
+
+      const filter = { name: student?.assignedClass };
+      const updatedDoc = { $push: { students: student } };
+      const result = await classroomsCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
 
