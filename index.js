@@ -28,7 +28,6 @@ app.get("/", (req, res) => {
 
 async function run() {
   const usersCollection = client.db("classroomDB").collection("users");
-  const teachersCollection = client.db("classroomDB").collection("teachers");
   const classroomsCollection = client
     .db("classroomDB")
     .collection("classrooms");
@@ -52,13 +51,75 @@ async function run() {
       if (isClassroomExist) {
         return res.send({ message: "A classroom is exist with this name" });
       }
-      const result = await classroomsCollection.insertOne(newClassroom);
+      const result = await classroomsCollection.insertOne({
+        ...newClassroom,
+        isTeacherHas: false,
+      });
       res.send(result);
     });
 
+    // crate a classroom
     app.get("/classrooms", async (req, res) => {
       const result = await classroomsCollection.find().toArray();
       res.send(result);
+    });
+
+    // save a teacher
+    app.patch("/add-teacher", async (req, res) => {
+      const teacher = req.body;
+      const isEmailExist = await usersCollection.findOne({
+        email: teacher?.email,
+      });
+      if (isEmailExist) {
+        return res.send({ message: "Email is existed" });
+      }
+      const resp = await usersCollection.insertOne({
+        email: teacher?.email,
+        password: teacher?.password,
+        role: "teacher",
+      });
+      if (!resp.insertedId) {
+        return res.send({ message: "Something went wrong" });
+      }
+      delete teacher.password;
+      const updatedDoc = {
+        $set: { isTeacherHas: true, teacher: { ...teacher } },
+      };
+      const result = await classroomsCollection.updateOne(
+        { name: teacher.assignedClass },
+        updatedDoc
+      );
+      res.send(result);
+    });
+
+    // get all class names where teacher is not assigned
+    app.get("/classroom-names", async (req, res) => {
+      try {
+        const options = {
+          projection: { _id: 0, name: 1 },
+        };
+        const result = await classroomsCollection
+          .find({ isTeacherHas: false }, options)
+          .toArray();
+        const names = result?.map((classroom) => classroom.name);
+        res.send(names);
+      } catch (error) {
+        res.send(error);
+      }
+    });
+
+    // get all class names:
+    app.get("/classroom-names-all", async (req, res) => {
+      try {
+        const options = {
+          projection: { _id: 0, name: 1 },
+        };
+        const result = await classroomsCollection.find({}, options).toArray();
+        const names = result?.map((classroom) => classroom.name);
+        res.send(names);
+      } catch (error) {
+        res.send(error);
+      }
     });
 
     console.log(
