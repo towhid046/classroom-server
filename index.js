@@ -72,6 +72,21 @@ async function run() {
       res.send(user);
     });
 
+    // get all students:
+    app.get("/specific-users/:role", async (req, res) => {
+      const role = req.params?.role;
+      if (!role) {
+        return res.send({ message: "User role is needed" });
+      }
+      const users = await usersCollection
+        .find(
+          { role },
+          { projection: { name: 1, role: 1, email: 1, assignedClass: 1 } }
+        )
+        .toArray();
+      res.send(users);
+    });
+
     // create a new classroom
     app.post("/classroom", async (req, res) => {
       const newClassroom = req.body;
@@ -93,6 +108,18 @@ async function run() {
     // get all classrooms
     app.get("/classrooms", async (req, res) => {
       const result = await classroomsCollection.find().toArray();
+      res.send(result);
+    });
+
+    // remove a classroom:
+    app.delete("/remove-classroom", async (req, res) => {
+      const id = req.query?.id;
+      if (!id) {
+        return res.send({ message: "Id is required" });
+      }
+      const result = await classroomsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
       res.send(result);
     });
 
@@ -204,6 +231,55 @@ async function run() {
       } catch (error) {
         res.send(error);
       }
+    });
+
+    // remove a student:
+    app.delete("/remove-student", async (req, res) => {
+      const email = req?.query?.email;
+      const assignedClass = req?.query?.assignedClass;
+      if (!email || !assignedClass) {
+        return res.send({
+          message: "Both Email and assigned class is require",
+        });
+      }
+      const student = await usersCollection.deleteOne({ email });
+      if (!student.deletedCount) {
+        return res.send({ message: "User not found" });
+      }
+      const query = { name: assignedClass };
+      const updatedDoc = {
+        $pull: { students: { email } },
+      };
+      const result = await classroomsCollection.updateOne(query, updatedDoc);
+      if (!result.modifiedCount) {
+        return res.send({ message: "Student not Found" });
+      }
+      res.send(result);
+    });
+
+    // remove a teacher:
+    app.delete("/remove-teacher", async (req, res) => {
+      const email = req?.query?.email;
+      const assignedClass = req?.query?.assignedClass;
+      if (!email || !assignedClass) {
+        return res.send({
+          message: "Both Email and assigned class is require",
+        });
+      }
+      const student = await usersCollection.deleteOne({ email });
+      if (!student.deletedCount) {
+        return res.send({ message: "User not found" });
+      }
+      const query = { name: assignedClass };
+      const updatedDoc = {
+        $unset: { teacher: "" },
+        $set: { isTeacherHas: false },
+      };
+      const result = await classroomsCollection.updateOne(query, updatedDoc);
+      if (!result.modifiedCount) {
+        return res.send({ message: "Student not Found" });
+      }
+      res.send(result);
     });
 
     console.log(
