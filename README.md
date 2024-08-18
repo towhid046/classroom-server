@@ -1,6 +1,6 @@
 ## Server Name: Classroom (server)
-### Live site that use this API: https://classroom-group.web.app
-- All Product API: https://classroom-server-nine.vercel.app/classrooms
+### Live site that uses this API: https://classroom-group.web.app
+- All classroom API: https://classroom-server-nine.vercel.app/classrooms
 ### Packages Used for This Server
 
 - **[cors](https://github.com/expressjs/cors)**: v2.8.5
