@@ -42,6 +42,36 @@ async function run() {
       res.send(result);
     });
 
+    // get a specific user:
+    app.get("/user", async (req, res) => {
+      try {
+        const { email, password } = req?.query;
+        if (!email || !password) {
+          return res.send({ message: "Both email and password is required" });
+        }
+        const user = await usersCollection.findOne({ email });
+        if (!user) {
+          return res.send({ message: `User doesn't found with this email` });
+        }
+        if (user.password !== password) {
+          return res.send({ message: `Password doesn't match` });
+        }
+        delete user.password;
+        res.send(user);
+      } catch (error) {
+        res.send(error);
+      }
+    });
+
+    app.get("/user-role", async (req, res) => {
+      const { id, email } = req?.query;
+      const user = await usersCollection.findOne(
+        { _id: new ObjectId(id), email },
+        { projection: { _id: 0, role: 1 } }
+      );
+      res.send(user);
+    });
+
     // create a new classroom
     app.post("/classroom", async (req, res) => {
       const newClassroom = req.body;
@@ -76,8 +106,7 @@ async function run() {
         return res.send({ message: "Email is existed" });
       }
       const resp = await usersCollection.insertOne({
-        email: teacher?.email,
-        password: teacher?.password,
+        ...teacher,
         role: "teacher",
       });
       if (!resp.insertedId) {
@@ -104,8 +133,7 @@ async function run() {
         return res.send({ message: "Email is existed" });
       }
       const resp = await usersCollection.insertOne({
-        email: student?.email,
-        password: student?.password,
+        ...student,
         role: "student",
       });
       if (!resp.insertedId) {
@@ -115,6 +143,35 @@ async function run() {
 
       const filter = { name: student?.assignedClass };
       const updatedDoc = { $push: { students: student } };
+      const result = await classroomsCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    app.patch("/add-period", async (req, res) => {
+      const { id, title, time } = req.body;
+      if (!id || !title || !time) {
+        return res.send({ message: "Title, time and id are required" });
+      }
+
+      const filter = { _id: new ObjectId(id) };
+      const classroom = await classroomsCollection.findOne(filter);
+
+      if (!classroom) {
+        return res.status(404).send({ message: "Classroom not found" });
+      }
+
+      // Check if the time exists in classroom.availableTimes
+      const timeIndex = classroom.availableTimes.findIndex((t) => t === time);
+      if (timeIndex !== -1) {
+        // Remove the time from availableTimes
+        classroom.availableTimes.splice(timeIndex, 1);
+        await classroomsCollection.updateOne(filter, {
+          $set: { availableTimes: classroom.availableTimes },
+        });
+      }
+
+      // Add the new period
+      const updatedDoc = { $push: { periods: { title, time } } };
       const result = await classroomsCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
